@@ -7,7 +7,7 @@ from torch.optim import SGD
 from avalanche.benchmarks.classic import PermutedMNIST, RotatedMNIST, SplitMNIST
 from avalanche.models import SimpleMLP
 from avalanche.training import GEM
-from avalanche.training.plugins import DualGEMPlugin
+from plugins import DualGEMPlugin
 
 def main(args):
     # Device config
@@ -61,7 +61,9 @@ def main(args):
         print("Current Classes: ", train_task.classes_in_this_experience)
         cl_strategy.train(train_task)
         results.append(cl_strategy.eval(test_stream))
-
+    import pandas as pd
+    df = pd.DataFrame(results)
+    df.to_csv(".\\examples\\GEM\\gem_example_results\\dual_SGD_results.csv")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
