@@ -32,15 +32,30 @@ class AGEMPlugin(SupervisedPlugin):
         """
 
         super().__init__()
-
+        
+        '''
+        "Patterns" refer to the stored samples from an experience (task). 
+        When a new experience arrives, we randomly sample up to `patterns_per_experience` samples from it and store in RAM
+        '''
         self.patterns_per_experience = int(patterns_per_experience)
-        self.sample_size = int(sample_size)
 
+        '''
+        "Samples", on the other hand, refers to the reference gradient. A-GEM randomly (while ensuring no single task dominates)
+        obtains a batch of samples from the union of ALL tasks memory buffers. These are used to calculate g_ref for the constraint.
+        '''
+        self.sample_size = int(sample_size)
+        
         # One AvalancheDataset for each experience
         self.buffers: List[AvalancheDataset] = []
+        '''
+        This dataloader draws minibatches of size (sample_size // number_of_buffers) from each buffer.
+        '''
         self.buffer_dataloader: Optional[GroupBalancedInfiniteDataLoader] = None
         # Placeholder iterator to avoid typing issues
         self.buffer_dliter: Iterator[Any] = iter([])
+        '''
+        This is g_ref
+        '''
         # Placeholder Tensor to avoid typing issues
         self.reference_gradients: Tensor = torch.empty(0)
 
@@ -104,7 +119,10 @@ class AGEMPlugin(SupervisedPlugin):
                     if p.grad is not None:
                         p.grad.copy_(grad_proj[count : count + n_param].view_as(p))
                     count += n_param
-
+    
+    '''
+    This method is probably defined by the 'SupervisedPlugin' interface. This method is just a wrapper for update_memory.
+    '''
     def after_training_exp(self, strategy, **kwargs):
         """Update replay memory with patterns from current experience."""
         self.update_memory(strategy.experience.dataset, **kwargs)
@@ -125,6 +143,12 @@ class AGEMPlugin(SupervisedPlugin):
             warnings.warn(
                 "Num workers > 0 is known to cause heavy" "slowdowns in AGEM."
             )
+
+        '''
+        This section ensures that if a experience (task) has more than `patterns_per_experience` samples, 
+        we randomly shuffle its indices and keep only that many. This mimics a uniform random sampling approach,
+        as defined in the A-GEM paper.
+        '''
         removed_els = len(dataset) - self.patterns_per_experience
         if removed_els > 0:
             indices = list(range(len(dataset)))
@@ -132,7 +156,11 @@ class AGEMPlugin(SupervisedPlugin):
             dataset = dataset.subset(indices[: self.patterns_per_experience])
 
         self.buffers.append(dataset)
-
+        '''
+        This part updates the dataloader to include the newly completed task in its minibatch sampling algorithm.
+        Recall that this dataloader ensures even distribution of samples across all k < t tasks when 
+        calculating g_ref.
+        '''
         persistent_workers = num_workers > 0
         self.buffer_dataloader = GroupBalancedInfiniteDataLoader(
             self.buffers,
@@ -141,4 +169,7 @@ class AGEMPlugin(SupervisedPlugin):
             pin_memory=False,
             persistent_workers=persistent_workers,
         )
+        '''
+        We gotta update the iterator to match the newly updated dataloader.
+        '''
         self.buffer_dliter = iter(self.buffer_dataloader)
