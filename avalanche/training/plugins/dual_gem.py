@@ -9,7 +9,7 @@ from avalanche.models import avalanche_forward
 from avalanche.training.plugins.strategy_plugin import SupervisedPlugin
 
 
-class GEMPlugin(SupervisedPlugin):
+class DualGEMPlugin(SupervisedPlugin):
     """
     Gradient Episodic Memory Plugin.
     GEM projects the gradient on the current minibatch by using an external
@@ -115,11 +115,18 @@ class GEMPlugin(SupervisedPlugin):
         else:
             # don't project (first experience)
             to_project = False
+            # placeholder for v_star
 
         if to_project:
             # find closest vector to g
-            v_star = self.solve_quadprog(g).to(strategy.device)
 
+            # old code (exact, slower)
+            # v_star = self.solve_quadprog(g).to(strategy.device)
+
+            # new code (approximation, faster)
+            v_star = self.solve_dualsgd(strategy.clock.train_exp_counter, strategy.device, g)
+            
+            # also old code
             num_pars = 0  # reshape v_star into the parameter matrices
             for p in strategy.model.parameters():
                 curr_pars = p.numel()
@@ -176,27 +183,53 @@ class GEMPlugin(SupervisedPlugin):
                     )
                 break
             tot += x.size(0)
+    
+    # t tasks, device dev, 
+    def solve_dualsgd(self, t, dev, g, I):
+        '''
+        theory: v* <- 0-vector
+        gradF w/ respect to v: G * (transpose(G) * v) + G * g
+        new-v_star <- old-v_star - alpha * gradF
+        new-v_star <- max[0-vector, v]
+        '''
+        # create a zero vector on the correct device
 
-    def solve_quadprog(self, g):
-        """
-        Solve quadratic programming with current gradient g and
-        gradients matrix on previous tasks G.
-        Taken from original code:
-        https://github.com/facebookresearch/GradientEpisodicMemory/blob/master/model/gem.py
-        """
+        # t may be exclusive, which means we would actually use t instead of t-1.         
+        v = torch.zeros(t - 1, device=dev)
+        z = torch.zeroes(t - 1, device=dev)
 
-        memories_np = self.G.cpu().double().numpy()
-        gradient_np = g.cpu().contiguous().view(-1).double().numpy()
-        t = memories_np.shape[0]
-        P = np.dot(memories_np, memories_np.transpose())
-        P = 0.5 * (P + P.transpose()) + np.eye(t) * 1e-3
-        q = np.dot(memories_np, gradient_np) * -1
-        G = np.eye(t)
-        h = np.zeros(t) + self.memory_strength
-        # solution with old quadprog library, same as the author's implementation
-        # v = quadprog.solve_qp(P, q, G, h)[0]
-        # using new library qpsolvers
-        v = qpsolvers.solve_qp(P=P, q=-q, G=-G.transpose(), h=-h, solver="quadprog")
-        v_star = np.dot(v, memories_np) + gradient_np
+        # does not depend on v_star
+        Gg = np.dot(self.G, g)
+        for i in range(I):
+            # todo: move G * transpose(G) to update per task
+            temp = np.dot(v, self.G)
+            temp = np.dot(self.G, temp)
+            gradF = temp + Gg
+            v -= lr * gradF
+            v = torch.max(v, z)
 
-        return torch.from_numpy(v_star).float()
+
+    # NOTE: commented out to reference later for matrix operations
+    # def solve_quadprog(self, g):
+    #     """
+    #     Solve quadratic programming with current gradient g and
+    #     gradients matrix on previous tasks G.
+    #     Taken from original code:
+    #     https://github.com/facebookresearch/GradientEpisodicMemory/blob/master/model/gem.py
+    #     """
+
+    #     memories_np = self.G.cpu().double().numpy()
+    #     gradient_np = g.cpu().contiguous().view(-1).double().numpy()
+    #     t = memories_np.shape[0]
+    #     P = np.dot(memories_np, memories_np.transpose())
+    #     P = 0.5 * (P + P.transpose()) + np.eye(t) * 1e-3
+    #     q = np.dot(memories_np, gradient_np) * -1
+    #     G = np.eye(t)
+    #     h = np.zeros(t) + self.memory_strength
+    #     # solution with old quadprog library, same as the author's implementation
+    #     # v = quadprog.solve_qp(P, q, G, h)[0]
+    #     # using new library qpsolvers
+    #     v = qpsolvers.solve_qp(P=P, q=-q, G=-G.transpose(), h=-h, solver="quadprog")
+    #     v_star = np.dot(v, memories_np) + gradient_np
+
+    #     return torch.from_numpy(v_star).float()

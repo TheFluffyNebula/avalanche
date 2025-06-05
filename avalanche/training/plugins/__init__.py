@@ -4,6 +4,7 @@ from .evaluation import EvaluationPlugin
 from .ewc import EWCPlugin
 from .gdumb import GDumbPlugin
 from .gem import GEMPlugin
+from .dual_gem import DualGEMPlugin
 from .lwf import LwFPlugin
 from .replay import ReplayPlugin
 from .strategy_plugin import SupervisedPlugin
