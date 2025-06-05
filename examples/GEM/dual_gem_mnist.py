@@ -37,7 +37,10 @@ def main(args):
     criterion = CrossEntropyLoss()
 
     # todo: fill out w/ parameters (consider testing w/ AGEM plugin first)
-    dualGEM_Plugin = DualGEMPlugin()
+    dualGEM_Plugin = DualGEMPlugin(
+        patterns_per_experience=256,
+        memory_strength=0.5
+    )
     # Continual learning strategy with default logger
     cl_strategy = GEM(
         model,

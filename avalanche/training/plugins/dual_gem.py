@@ -192,7 +192,8 @@ class DualGEMPlugin(SupervisedPlugin):
         new-v_star <- old-v_star - alpha * gradF
         new-v_star <- max[0-vector, v]
         '''
-        # create a zero vector on the correct device
+        # learning rate
+        lr = 0.01
 
         # t may be exclusive, which means we would actually use t instead of t-1.         
         v = torch.zeros(t - 1, device=dev)
