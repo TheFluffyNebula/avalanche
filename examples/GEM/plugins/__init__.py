@@ -1,1 +1,1 @@
-from .dual_gem import DualGEMPlugin
+from .dual_gem_ggt import DualGEMPlugin

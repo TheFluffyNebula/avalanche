@@ -209,7 +209,7 @@ class DualGEMPlugin(SupervisedPlugin):
             v -= lr * gradF
             v = torch.max(v, z)
         # print(self.G.T.shape, v.shape, g.shape)
-        x = torch.mv(self.G.T, v)
+        # x = torch.mv(self.G.T, v)
         # print(x.shape)
         return torch.mv(self.G.T, v) + g
     
