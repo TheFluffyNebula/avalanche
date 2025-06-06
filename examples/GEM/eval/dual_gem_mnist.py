@@ -1,24 +1,37 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from plugins import DualGEMPlugin
+
 from avalanche.training import GEM
 import torch
 import argparse
 from torch.nn import CrossEntropyLoss
 from torch.optim import SGD
-
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from avalanche.benchmarks.classic import PermutedMNIST, RotatedMNIST, SplitMNIST
 from avalanche.models import SimpleMLP
 from avalanche.training import GEM
-from plugins import DualGEMPlugin
 from avalanche.training.plugins import EvaluationPlugin
 from avalanche.evaluation.metrics import forgetting_metrics, \
 accuracy_metrics, loss_metrics, timing_metrics, cpu_usage_metrics, \
 confusion_matrix_metrics, disk_usage_metrics
 from avalanche.logging import InteractiveLogger
 
+import random
+import numpy as np
+
 def main(args):
+    # Set seeds
+    seed = 123  # or any other number
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    # Ensure deterministic behavior on GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
     # Device config
     device = torch.device(
         f"cuda:{args.cuda}" if torch.cuda.is_available() and args.cuda >= 0 else "cpu"
@@ -86,7 +99,7 @@ def main(args):
         results.append(cl_strategy.eval(test_stream))
     import pandas as pd
     df = pd.DataFrame(results)
-    df.to_csv(".\\examples\\GEM\\\\eval\\results\\dual_gem_eval.csv")
+    df.to_csv(".\\examples\\GEM\\\\eval\\results\\dual_gem_eval2.csv")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

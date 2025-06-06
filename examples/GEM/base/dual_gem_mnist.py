@@ -9,7 +9,21 @@ from avalanche.models import SimpleMLP
 from avalanche.training import GEM
 from plugins import DualGEMPlugin
 
+import random
+import numpy as np
+
 def main(args):
+    # Set seeds
+    seed = 123  # or any other number
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    # Ensure deterministic behavior on GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     # Device config
     device = torch.device(
         f"cuda:{args.cuda}" if torch.cuda.is_available() and args.cuda >= 0 else "cpu"
