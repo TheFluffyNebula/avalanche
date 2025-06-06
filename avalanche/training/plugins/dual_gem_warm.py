@@ -8,10 +8,6 @@ from torch.utils.data import DataLoader
 from avalanche.models import avalanche_forward
 from avalanche.training.plugins.strategy_plugin import SupervisedPlugin
 
-'''
-optimizations over original (dual_gem.py):
-1. precompute G
-'''
 
 class DualGEMPlugin(SupervisedPlugin):
     """
@@ -45,7 +41,7 @@ class DualGEMPlugin(SupervisedPlugin):
         self.memory_tid: Dict[int, Tensor] = dict()
         # initialize G, the matrix for gradients on loss on for (f(Θ), memory buffer)
         self.G: Tensor = torch.empty(0)
-        self.GGT = torch.empty(0)
+        self.vstar = torch.empty(0)
 
     def before_training_iteration(self, strategy, **kwargs):
         """
@@ -94,8 +90,6 @@ class DualGEMPlugin(SupervisedPlugin):
                 )
             # Stack all experience gradient vectors into a matrix 
             self.G = torch.stack(G)  # (experiences, parameters)
-            # calculate GGT here
-            self.GGT = torch.matmul(G, G.T)
 
     @torch.no_grad()
     def after_backward(self, strategy, **kwargs):
@@ -203,8 +197,11 @@ class DualGEMPlugin(SupervisedPlugin):
         lr = 0.01
 
         # t may be exclusive, which means we would actually use t instead of t-1.         
-        v = torch.zeros(t - 1, device=dev)
-        z = torch.zeroes(t - 1, device=dev)
+        if self.vstar.numel() == t - 1:
+            v = self.vstar.clone()
+        else:
+            v = torch.zeros(t - 1, device=dev)
+        z = torch.zeros(t - 1, device=dev)
 
         # does not depend on v_star
         Gg = np.dot(self.G, g)

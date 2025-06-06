@@ -8,6 +8,10 @@ from torch.utils.data import DataLoader
 from avalanche.models import avalanche_forward
 from avalanche.training.plugins.strategy_plugin import SupervisedPlugin
 
+'''
+optimizations over original (dual_gem.py):
+1. precompute G
+'''
 
 class DualGEMPlugin(SupervisedPlugin):
     """
@@ -41,6 +45,7 @@ class DualGEMPlugin(SupervisedPlugin):
         self.memory_tid: Dict[int, Tensor] = dict()
         # initialize G, the matrix for gradients on loss on for (f(Θ), memory buffer)
         self.G: Tensor = torch.empty(0)
+        self.GGT = torch.empty(0)
 
     def before_training_iteration(self, strategy, **kwargs):
         """
@@ -89,6 +94,8 @@ class DualGEMPlugin(SupervisedPlugin):
                 )
             # Stack all experience gradient vectors into a matrix 
             self.G = torch.stack(G)  # (experiences, parameters)
+            # calculate GGT here
+            self.GGT = torch.matmul(G, G.T)
 
     @torch.no_grad()
     def after_backward(self, strategy, **kwargs):
@@ -203,34 +210,7 @@ class DualGEMPlugin(SupervisedPlugin):
         Gg = np.dot(self.G, g)
         for i in range(I):
             # todo: move G * transpose(G) to update per task
-            temp = np.dot(v, self.G)
-            temp = np.dot(self.G, temp)
+            temp = np.dot(self.GGT, v)
             gradF = temp + Gg
             v -= lr * gradF
             v = torch.max(v, z)
-        
-
-    # NOTE: commented out to reference later for matrix operations
-    # def solve_quadprog(self, g):
-    #     """
-    #     Solve quadratic programming with current gradient g and
-    #     gradients matrix on previous tasks G.
-    #     Taken from original code:
-    #     https://github.com/facebookresearch/GradientEpisodicMemory/blob/master/model/gem.py
-    #     """
-
-    #     memories_np = self.G.cpu().double().numpy()
-    #     gradient_np = g.cpu().contiguous().view(-1).double().numpy()
-    #     t = memories_np.shape[0]
-    #     P = np.dot(memories_np, memories_np.transpose())
-    #     P = 0.5 * (P + P.transpose()) + np.eye(t) * 1e-3
-    #     q = np.dot(memories_np, gradient_np) * -1
-    #     G = np.eye(t)
-    #     h = np.zeros(t) + self.memory_strength
-    #     # solution with old quadprog library, same as the author's implementation
-    #     # v = quadprog.solve_qp(P, q, G, h)[0]
-    #     # using new library qpsolvers
-    #     v = qpsolvers.solve_qp(P=P, q=-q, G=-G.transpose(), h=-h, solver="quadprog")
-    #     v_star = np.dot(v, memories_np) + gradient_np
-
-    #     return torch.from_numpy(v_star).float()

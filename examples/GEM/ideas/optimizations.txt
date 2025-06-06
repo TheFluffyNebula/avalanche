@@ -1,5 +1,14 @@
-1. warm initialization -- preserve previous v_star instead of initializing to zero
+to try:
 2. no vanilla python for loop in gradient descent
-3. instead of two matrix vector products (precomputation of G * transpose(G))
-4. compute minimum eigenvalue of Gg matrix and set that to the learning rate (Truss region)
+4. compute (1/max-eigenvalue) of Gg matrix and set that to the learning rate (Truss region)
 -- in the same vein, dynamic learning rate
+
+in progress:
+1. warm initialization -- preserve previous v_star instead of initializing to zero
+idea: converge faster
+file: dual_gem_warm.py
+
+done:
+3. instead of two matrix vector products (precomputation of G * transpose(G))
+idea: move G * transpose(G) computation outside of a nested loop
+file: dual_gem_ggt.py
