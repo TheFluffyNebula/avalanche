@@ -8,10 +8,6 @@ from torch.utils.data import DataLoader
 from avalanche.models import avalanche_forward
 from avalanche.training.plugins.strategy_plugin import SupervisedPlugin
 
-'''
-optimizations over original (dual_gem.py):
-1. precompute G
-'''
 
 class DualGEMPlugin(SupervisedPlugin):
     """
@@ -45,7 +41,7 @@ class DualGEMPlugin(SupervisedPlugin):
         self.memory_tid: Dict[int, Tensor] = dict()
         # initialize G, the matrix for gradients on loss on for (f(Θ), memory buffer)
         self.G: Tensor = torch.empty(0)
-        self.GGT = torch.empty(0)
+        self.vstar = torch.empty(0)
 
     def before_training_iteration(self, strategy, **kwargs):
         """
@@ -94,8 +90,6 @@ class DualGEMPlugin(SupervisedPlugin):
                 )
             # Stack all experience gradient vectors into a matrix 
             self.G = torch.stack(G)  # (experiences, parameters)
-            # calculate GGT here
-            self.GGT = torch.matmul(self.G, self.G.T)
 
     @torch.no_grad()
     def after_backward(self, strategy, **kwargs):
@@ -131,8 +125,7 @@ class DualGEMPlugin(SupervisedPlugin):
             # v_star = self.solve_quadprog(g).to(strategy.device)
 
             # new code (approximation, faster)
-            v_star = self.solve_dualsgd(strategy.clock.train_exp_counter, strategy.device, g, 10)
-            # print("V STAR SHAPE:", v_star.shape)
+            v_star = self.solve_dualsgd(strategy.clock.train_exp_counter, strategy.device, g)
             
             # also old code
             num_pars = 0  # reshape v_star into the parameter matrices
@@ -204,15 +197,18 @@ class DualGEMPlugin(SupervisedPlugin):
         lr = 0.01
 
         # t may be exclusive, which means we would actually use t instead of t-1.         
-        v = torch.zeros(t, device=dev)
+        if self.vstar.numel() == t - 1:
+            v = self.vstar.clone()
+        else:
+            v = torch.zeros(t, device=dev)
         z = torch.zeros(t, device=dev)
 
         # does not depend on v_star
         Gg = torch.mv(self.G, g)
-        for _ in range(I):
+        for i in range(I):
             # todo: move G * transpose(G) to update per task
-            temp = torch.mv(self.GGT, v)
+            temp = torch.mv(v, self.G)
+            temp = torch.mv(self.G, temp)
             gradF = temp + Gg
             v -= lr * gradF
             v = torch.max(v, z)
-        return torch.mv(self.G.T, v) + g

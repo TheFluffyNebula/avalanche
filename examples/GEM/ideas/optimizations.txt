@@ -1,7 +1,9 @@
 to try:
 2. no vanilla python for loop in gradient descent
-4. compute (1/max-eigenvalue) of Gg matrix and set that to the learning rate (Truss region)
+4. compute (1/max-eigenvalue) of Gg matrix and set that to the learning rate (Trust region)
 -- in the same vein, dynamic learning rate
+
+combining multiple techniques (possible all, take the ones that work)
 
 in progress:
 1. warm initialization -- preserve previous v_star instead of initializing to zero
