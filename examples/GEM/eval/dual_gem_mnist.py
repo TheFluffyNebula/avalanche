@@ -1,28 +1,22 @@
-################################################################################
-# Copyright (c) 2021 ContinualAI.                                              #
-# Copyrights licensed under the MIT License.                                   #
-# See the accompanying LICENSE file for terms.                                 #
-#                                                                              #
-# Date: 20-11-2020                                                             #
-# Author(s): Vincenzo Lomonaco                                                 #
-# E-mail: contact@continualai.org                                              #
-# Website: avalanche.continualai.org                                           #
-################################################################################
-
-"""
-In this simple example we show all the different ways you can use MNIST with
-Avalanche.
-"""
-
+from avalanche.training import GEM
 import torch
 import argparse
 from torch.nn import CrossEntropyLoss
 from torch.optim import SGD
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from avalanche.benchmarks.classic import PermutedMNIST, RotatedMNIST, SplitMNIST
 from avalanche.models import SimpleMLP
 from avalanche.training import GEM
-
+from plugins import DualGEMPlugin
+from avalanche.training.plugins import EvaluationPlugin
+from avalanche.evaluation.metrics import forgetting_metrics, \
+accuracy_metrics, loss_metrics, timing_metrics, cpu_usage_metrics, \
+confusion_matrix_metrics, disk_usage_metrics
+from avalanche.logging import InteractiveLogger
 
 def main(args):
     # Device config
@@ -51,6 +45,24 @@ def main(args):
     optimizer = SGD(model.parameters(), lr=0.001, momentum=0.9)
     criterion = CrossEntropyLoss()
 
+    # todo: fill out w/ parameters (consider testing w/ AGEM plugin first)
+    dualGEM_Plugin = DualGEMPlugin(
+        patterns_per_experience=256,
+        memory_strength=0.5
+    )
+
+    eval_plugin = EvaluationPlugin(
+        accuracy_metrics(minibatch=True, epoch=True, experience=True, stream=True),
+        loss_metrics(minibatch=True, epoch=True, experience=True, stream=True),
+        timing_metrics(epoch=True),
+        forgetting_metrics(experience=True, stream=True),
+        cpu_usage_metrics(experience=True),
+        confusion_matrix_metrics(num_classes=benchmark.n_classes, save_image=False, stream=True),
+        disk_usage_metrics(minibatch=True, epoch=True, experience=True, stream=True),
+        loggers=[InteractiveLogger()],
+        strict_checks=False
+    )
+
     # Continual learning strategy with default logger
     cl_strategy = GEM(
         model,
@@ -61,7 +73,9 @@ def main(args):
         eval_mb_size=32,
         device=device,
         patterns_per_exp=256,     # ✅ required argument
-        memory_strength=0.5       # optional, but good default from the paper
+        memory_strength=0.5,       # optional, but good default from the paper
+        plugins=[dualGEM_Plugin],
+        evaluator=eval_plugin,
     )
 
     # train and test loop
@@ -70,7 +84,9 @@ def main(args):
         print("Current Classes: ", train_task.classes_in_this_experience)
         cl_strategy.train(train_task)
         results.append(cl_strategy.eval(test_stream))
-
+    import pandas as pd
+    df = pd.DataFrame(results)
+    df.to_csv(".\\examples\\GEM\\\\eval\\results\\dual_gem_eval.csv")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -90,3 +106,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+

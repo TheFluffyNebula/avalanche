@@ -6,8 +6,7 @@ from torch.optim import SGD
 
 from avalanche.benchmarks.classic import PermutedMNIST, RotatedMNIST, SplitMNIST
 from avalanche.models import SimpleMLP
-from avalanche.training import GEM
-from plugins import DualGEMPlugin
+from avalanche.training import AGEM
 
 def main(args):
     # Device config
@@ -37,7 +36,7 @@ def main(args):
     criterion = CrossEntropyLoss()
 
     # Continual learning strategy with default logger
-    cl_strategy = GEM(
+    cl_strategy = AGEM(
         model,
         optimizer,
         criterion,
