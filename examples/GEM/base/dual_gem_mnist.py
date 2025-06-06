@@ -82,7 +82,7 @@ def main(args):
         results.append(cl_strategy.eval(test_stream))
     import pandas as pd
     df = pd.DataFrame(results)
-    df.to_csv(".\\examples\\GEM\\gem_example_results\\dual_SGD_results.csv")
+    # df.to_csv(".\\examples\\GEM\\gem_example_results\\dual_SGD_results.csv")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

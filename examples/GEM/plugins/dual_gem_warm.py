@@ -90,6 +90,7 @@ class DualGEMPlugin(SupervisedPlugin):
                 )
             # Stack all experience gradient vectors into a matrix 
             self.G = torch.stack(G)  # (experiences, parameters)
+            self.vstar = torch.zeros(strategy.clock.train_exp_counter, device=strategy.device)
 
     @torch.no_grad()
     def after_backward(self, strategy, **kwargs):
@@ -125,7 +126,7 @@ class DualGEMPlugin(SupervisedPlugin):
             # v_star = self.solve_quadprog(g).to(strategy.device)
 
             # new code (approximation, faster)
-            v_star = self.solve_dualsgd(strategy.clock.train_exp_counter, strategy.device, g)
+            v_star = self.solve_dualsgd(strategy.clock.train_exp_counter, strategy.device, g, 10)
             
             # also old code
             num_pars = 0  # reshape v_star into the parameter matrices
@@ -196,19 +197,14 @@ class DualGEMPlugin(SupervisedPlugin):
         # learning rate
         lr = 0.01
 
-        # t may be exclusive, which means we would actually use t instead of t-1.         
-        if self.vstar.numel() == t - 1:
-            v = self.vstar.clone()
-        else:
-            v = torch.zeros(t, device=dev)
         z = torch.zeros(t, device=dev)
-
         # does not depend on v_star
         Gg = torch.mv(self.G, g)
         for i in range(I):
-            # todo: move G * transpose(G) to update per task
-            temp = torch.mv(v, self.G)
+            # todo: move G * transpose(G) to update per task            
+            temp = torch.mv(self.G.T, self.vstar)
             temp = torch.mv(self.G, temp)
             gradF = temp + Gg
-            v -= lr * gradF
-            v = torch.max(v, z)
+            self.vstar -= lr * gradF
+            self.vstar = torch.max(self.vstar, z)
+        return torch.mv(self.G.T, self.vstar) + g

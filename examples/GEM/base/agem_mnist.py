@@ -58,7 +58,6 @@ def main(args):
         eval_mb_size=32,
         device=device,
         patterns_per_exp=256,     # ✅ required argument
-        memory_strength=0.5,       # optional, but good default from the paper
     )
 
     # train and test loop
@@ -69,7 +68,7 @@ def main(args):
         results.append(cl_strategy.eval(test_stream))
     import pandas as pd
     df = pd.DataFrame(results)
-    df.to_csv(".\\examples\\GEM\\gem_example_results\\gem_results.csv")
+    # df.to_csv(".\\examples\\GEM\\gem_example_results\\gem_results.csv")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

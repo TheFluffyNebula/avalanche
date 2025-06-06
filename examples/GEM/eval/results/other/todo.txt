@@ -1,2 +1,4 @@
-re-do GEM eval on set seed
-GEM eval
+re-do dual-GEM eval on set seed
+AGEM eval
+
+run warm w/ less iterations (same accuracy?)
