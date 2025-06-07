@@ -1,1 +1,1 @@
-from .dual_gem_warm import DualGEMPlugin
+from .dual_gem_best_learning_rate import DualGEMPlugin

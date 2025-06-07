@@ -6,11 +6,13 @@ to try:
 combining multiple techniques (possible all, take the ones that work)
 
 in progress:
-1. warm initialization -- preserve previous v_star instead of initializing to zero
-idea: converge faster
-file: dual_gem_warm.py
+
 
 done:
 3. instead of two matrix vector products (precomputation of G * transpose(G))
 idea: move G * transpose(G) computation outside of a nested loop
 file: dual_gem_ggt.py
+
+1. warm initialization -- preserve previous v_star instead of initializing to zero
+idea: converge faster
+file: dual_gem_warm.py
